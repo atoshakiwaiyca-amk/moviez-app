@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Log In — Moviez</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<header class="topbar">
+  <a href="index.html" class="logo">MOVIE<span>Z</span></a>
+  <nav id="nav"></nav>
+</header>
+
+<div class="container">
+  <form class="card-form" id="loginForm">
+    <h2>Log In</h2>
+    <div id="msg" class="msg" style="display:none;"></div>
+
+    <label for="email">Email</label>
+    <input type="email" id="email" required />
+
+    <label for="password">Password</label>
+    <input type="password" id="password" required />
+
+    <button type="submit">Log In</button>
+    <p style="text-align:center;margin-top:16px;">
+      Don't have an account? <a class="link" href="register.html">Sign up here</a>
+    </p>
+  </form>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+renderNav();
+const form = document.getElementById('loginForm');
+const msgEl = document.getElementById('msg');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+
+  try {
+    const data = await apiFetch('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+    saveSession(data.token, data.user);
+    window.location.href = data.user.role === 'admin' ? '../admin/dashboard.html' : 'index.html';
+  } catch (err) {
+    showMsg(msgEl, err.message);
+  }
+});
+</script>
+</body>
+</html>

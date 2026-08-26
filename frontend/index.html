@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Moviez — Movies. Anytime. Anywhere.</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<header class="topbar">
+  <a href="index.html" class="logo">MOVIE<span>Z</span></a>
+  <nav id="nav"></nav>
+</header>
+
+<div class="container">
+  <h1>Browse Movies</h1>
+  <div class="tagline">Movies. Anytime. Anywhere.</div>
+  <div id="grid" class="grid"></div>
+  <div id="empty" class="empty-state" style="display:none;">No movies yet. Check back soon.</div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+renderNav();
+
+async function loadMovies() {
+  const grid = document.getElementById('grid');
+  try {
+    const movies = await apiFetch('/movies');
+    if (movies.length === 0) {
+      document.getElementById('empty').style.display = 'block';
+      return;
+    }
+    grid.innerHTML = movies.map(m => `
+      <a class="movie-card" href="movie.html?id=${m.id}">
+        <img src="${m.poster_path ? 'http://localhost:4000' + m.poster_path : 'https://via.placeholder.com/300x450?text=' + encodeURIComponent(m.title)}" alt="${m.title}" />
+        <div class="info">
+          <div class="title">${m.title}</div>
+          <div class="price">TZS ${Number(m.price).toLocaleString()}</div>
+        </div>
+      </a>
+    `).join('');
+  } catch (err) {
+    grid.innerHTML = `<p style="color:#e05252">${err.message}</p>`;
+  }
+}
+
+loadMovies();
+</script>
+</body>
+</html>

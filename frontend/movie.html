@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Movie — Moviez</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<header class="topbar">
+  <a href="index.html" class="logo">MOVIE<span>Z</span></a>
+  <nav id="nav"></nav>
+</header>
+
+<div class="container">
+  <div id="msg" class="msg" style="display:none;"></div>
+  <div id="detail" class="movie-detail"></div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+renderNav();
+const msgEl = document.getElementById('msg');
+const params = new URLSearchParams(window.location.search);
+const movieId = params.get('id');
+
+async function loadMovie() {
+  try {
+    const m = await apiFetch(`/movies/${movieId}`);
+    document.getElementById('detail').innerHTML = `
+      <img src="${m.poster_path ? 'http://localhost:4000' + m.poster_path : 'https://via.placeholder.com/300x450?text=' + encodeURIComponent(m.title)}" alt="${m.title}" />
+      <div class="meta">
+        <h1>${m.title}</h1>
+        <p style="color:#aaa;">${m.description || ''}</p>
+        <div class="price-tag">TZS ${Number(m.price).toLocaleString()}</div>
+        <button id="actionBtn" style="max-width:240px;">Buy & Download</button>
+      </div>
+    `;
+    document.getElementById('actionBtn').addEventListener('click', handleAction);
+  } catch (err) {
+    showMsg(msgEl, err.message);
+  }
+}
+
+async function handleAction() {
+  if (!getToken()) {
+    window.location.href = 'login.html';
+    return;
+  }
+  try {
+    // Try generating a download link directly - works if already purchased
+    let linkData;
+    try {
+      linkData = await apiFetch(`/purchases/download-link/${movieId}`);
+    } catch {
+      // Not purchased yet - "pay" then generate the link
+      await apiFetch(`/purchases/${movieId}`, { method: 'POST' });
+      linkData = await apiFetch(`/purchases/download-link/${movieId}`);
+    }
+    showMsg(msgEl, `Payment/download ready! The link expires in ${linkData.expiresInMinutes} minute(s).`, 'success');
+    window.location.href = `http://localhost:4000${linkData.downloadUrl}`;
+  } catch (err) {
+    showMsg(msgEl, err.message);
+  }
+}
+
+loadMovie();
+</script>
+</body>
+</html>
