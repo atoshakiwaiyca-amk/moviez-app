@@ -59,7 +59,6 @@ const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`Moviez backend inaendesha kwenye http://localhost:${PORT}`);
 });
-const express = require('express');
 const path = require('path');
 const cors = require('cors');
 
