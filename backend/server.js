@@ -60,7 +60,6 @@ app.listen(PORT, () => {
   console.log(`Moviez backend inaendesha kwenye http://localhost:${PORT}`);
 });
 
-const PORT = process.env.PORT || 4000;
 
 // Middleware
 app.use(cors());
