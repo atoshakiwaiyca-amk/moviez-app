@@ -55,11 +55,12 @@ app.use((err, req, res, next) => {
 
 seedAdmin();
 
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`Moviez backend inaendesha kwenye http://localhost:${PORT}`);
-});
 
+const path = require('path');
+const cors = require('cors');
+const express = require('express');
+
+const app = express();
 
 // Middleware
 app.use(cors());
@@ -74,7 +75,6 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Example: app.use('/api/movies', movieRoutes);
 
 // 2. Serve Frontend Static Files
-// Adjust '../frontend' if your frontend folder structure is different
 app.use(express.static(path.join(__dirname, '../frontend')));
 
 // 3. Fallback Route: Direct all other requests to index.html
@@ -83,8 +83,7 @@ app.get('*', (req, res) => {
 });
 
 // Start Server
-
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-});// trigger redeploy
+});
