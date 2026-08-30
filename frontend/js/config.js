@@ -1,2 +1,2 @@
-// Badilisha hii na anwani ya server yako halisi ukishaweka app "live" (production)
-const API_BASE = '/api';
+// frontend/js/config.js
+window.API_BASE = 'https://moviez-app-api.onrender.com/api';

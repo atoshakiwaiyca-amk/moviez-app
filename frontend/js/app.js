@@ -1,5 +1,5 @@
-// Set relative base path for production deployment (Render)
-const API_BASE = '/api';
+// Tumia API_BASE kutoka config.js au default
+const API_BASE = window.API_BASE || 'https://moviez-app-api.onrender.com/api';
 
 // Helper functions for Authentication Token & User State
 function getToken() {
@@ -8,7 +8,11 @@ function getToken() {
 
 function getUser() {
   const user = localStorage.getItem('user');
-  return user ? JSON.parse(user) : null;
+  try {
+    return user ? JSON.parse(user) : null;
+  } catch {
+    return null;
+  }
 }
 
 function setAuth(token, user) {
@@ -24,27 +28,38 @@ function logout() {
 
 // Global API Fetch wrapper
 async function apiFetch(path, options = {}) {
-  const headers = options.headers || {};
+  const headers = { ...(options.headers || {}) };
 
-  // Add Auth Header if user is logged in
   const token = getToken();
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  // Set JSON Content-Type only when sending non-FormData bodies
   if (options.body && !(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
-  const data = await res.json().catch(() => ({}));
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
 
-  if (!res.ok) {
-    throw new Error(data.error || 'Something went wrong.');
+  try {
+    const res = await fetch(`${API_BASE}${cleanPath}`, {
+      ...options,
+      headers
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data.error || data.message || `Error ${res.status}: Server request failed.`);
+    }
+
+    return data;
+  } catch (err) {
+    if (err.name === 'TypeError' && err.message.includes('fetch')) {
+      throw new Error('Imeshindwa kuunganisha na Server (Network/CORS Error). Hakikisha Server ya Render ipo hewani.');
+    }
+    throw err;
   }
-
-  return data;
 }
 
 // Global Notification Helper
