@@ -29,8 +29,8 @@ async function loadMovie() {
   try {
     const m = await apiFetch(`/movies/${movieId}`);
     document.getElementById('detail').innerHTML = `
-      <img src="${m.poster_path ? 'http://localhost:4000' + m.poster_path : 'https://via.placeholder.com/300x450?text=' + encodeURIComponent(m.title)}" alt="${m.title}" />
-      <div class="meta">
+    <img src="${m.poster_path ? m.poster_path : 'https://via.placeholder.com/300x450?text=' + encodeURIComponent(m.title)}" alt="${m.title}" />
+<div class="meta">
         <h1>${m.title}</h1>
         <p style="color:#aaa;">${m.description || ''}</p>
         <div class="price-tag">TZS ${Number(m.price).toLocaleString()}</div>
@@ -58,9 +58,9 @@ async function handleAction() {
       await apiFetch(`/purchases/${movieId}`, { method: 'POST' });
       linkData = await apiFetch(`/purchases/download-link/${movieId}`);
     }
-    showMsg(msgEl, `Payment/download ready! The link expires in ${linkData.expiresInMinutes} minute(s).`, 'success');
-    window.location.href = `http://localhost:4000${linkData.downloadUrl}`;
-  } catch (err) {
+    `;
+  } catch (err) {showMsg(msgEl, `Payment/download ready! The link expires in ${linkData.expiresInMinutes} minute(s).`, 'success');
+window.location.href = linkData.downloadUrl;
     showMsg(msgEl, err.message);
   }
 }

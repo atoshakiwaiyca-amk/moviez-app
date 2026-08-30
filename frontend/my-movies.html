@@ -34,9 +34,9 @@ async function load() {
     }
     grid.innerHTML = movies.map(m => `
       <a class="movie-card" href="movie.html?id=${m.id}">
-        <img src="${m.poster_path ? 'http://localhost:4000' + m.poster_path : 'https://via.placeholder.com/300x450?text=' + encodeURIComponent(m.title)}" alt="${m.title}" />
-        <div class="info">
-          <div class="title">${m.title}</div>
+        
+          <div class="title"><img src="${m.poster_path ? m.poster_path : 'https://via.placeholder.com/300x450?text=' + encodeURIComponent(m.title)}" alt="${m.title}" />
+<div class="info">${m.title}</div>
           <div class="price" style="color:#4caf7d;">Purchased</div>
         </div>
       </a>
