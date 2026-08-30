@@ -29,8 +29,8 @@ async function loadMovie() {
   try {
     const m = await apiFetch(`/movies/${movieId}`);
     document.getElementById('detail').innerHTML = `
-    <img src="${m.poster_path ? m.poster_path : 'https://via.placeholder.com/300x450?text=' + encodeURIComponent(m.title)}" alt="${m.title}" />
-<div class="meta">
+      <img src="${m.poster_path ? m.poster_path : 'https://via.placeholder.com/300x450?text=' + encodeURIComponent(m.title)}" alt="${m.title}" />
+      <div class="meta">
         <h1>${m.title}</h1>
         <p style="color:#aaa;">${m.description || ''}</p>
         <div class="price-tag">TZS ${Number(m.price).toLocaleString()}</div>
@@ -49,18 +49,19 @@ async function handleAction() {
     return;
   }
   try {
-    // Try generating a download link directly - works if already purchased
     let linkData;
     try {
+      // Jaribu kupata download link kama tayari amenunua
       linkData = await apiFetch(`/purchases/download-link/${movieId}`);
     } catch {
-      // Not purchased yet - "pay" then generate the link
+      // Kama bado hajafanya malipo, fanya purchase kwanza kisha toa link
       await apiFetch(`/purchases/${movieId}`, { method: 'POST' });
       linkData = await apiFetch(`/purchases/download-link/${movieId}`);
     }
-    `;
-  } catch (err) {showMsg(msgEl, `Payment/download ready! The link expires in ${linkData.expiresInMinutes} minute(s).`, 'success');
-window.location.href = linkData.downloadUrl;
+
+    showMsg(msgEl, `Payment/download ready! The link expires in ${linkData.expiresInMinutes} minute(s).`, 'success');
+    window.location.href = linkData.downloadUrl;
+  } catch (err) {
     showMsg(msgEl, err.message);
   }
 }
