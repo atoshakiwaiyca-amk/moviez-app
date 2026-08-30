@@ -1,66 +1,86 @@
-// ---------- AUTH HELPERS (used on every page) ----------
-function saveSession(token, user) {
-  localStorage.setItem('moviez_token', token);
-  localStorage.setItem('moviez_user', JSON.stringify(user));
-}
+// Set relative base path for production deployment (Render)
+const API_BASE = '/api';
 
+// Helper functions for Authentication Token & User State
 function getToken() {
-  return localStorage.getItem('moviez_token');
+  return localStorage.getItem('token');
 }
 
 function getUser() {
-  const raw = localStorage.getItem('moviez_user');
-  return raw ? JSON.parse(raw) : null;
+  const user = localStorage.getItem('user');
+  return user ? JSON.parse(user) : null;
+}
+
+function setAuth(token, user) {
+  localStorage.setItem('token', token);
+  localStorage.setItem('user', JSON.stringify(user));
 }
 
 function logout() {
-  localStorage.removeItem('moviez_token');
-  localStorage.removeItem('moviez_user');
-  window.location.href = 'login.html';
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  window.location.href = 'index.html';
 }
 
+// Global API Fetch wrapper
 async function apiFetch(path, options = {}) {
-  const token = getToken();
   const headers = options.headers || {};
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  if (!(options.body instanceof FormData) && options.body) {
+
+  // Add Auth Header if user is logged in
+  const token = getToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  // Set JSON Content-Type only when sending non-FormData bodies
+  if (options.body && !(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
+
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+
+  if (!res.ok) {
+    throw new Error(data.error || 'Something went wrong.');
+  }
+
   return data;
 }
 
-function showMsg(el, text, type = 'error') {
-  el.textContent = text;
+// Global Notification Helper
+function showMsg(el, message, type = 'error') {
+  if (!el) return;
+  el.textContent = message;
   el.className = `msg ${type}`;
   el.style.display = 'block';
 }
 
-function requireLogin() {
-  if (!getToken()) window.location.href = 'login.html';
-}
-
+// Dynamic Navigation Renderer
 function renderNav() {
+  const nav = document.getElementById('nav');
+  if (!nav) return;
+
   const user = getUser();
-  const navEl = document.getElementById('nav');
-  if (!navEl) return;
   if (user) {
-    navEl.innerHTML = `
-      <a href="index.html">Movies</a>
-      <a href="my-movies.html">My Movies</a>
-      <a href="#" id="logoutBtn">Log Out</a>
-    `;
-    document.getElementById('logoutBtn').addEventListener('click', (e) => {
-      e.preventDefault();
-      logout();
-    });
+    let links = `<a href="index.html">Home</a>`;
+    if (user.role === 'admin') {
+      links += `<a href="admin.html">Admin</a>`;
+    }
+    links += `<a href="#" id="logoutBtn">Logout (${user.email})</a>`;
+    nav.innerHTML = links;
+
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        logout();
+      });
+    }
   } else {
-    navEl.innerHTML = `
-      <a href="index.html">Movies</a>
-      <a href="login.html">Log In</a>
-      <a href="register.html">Sign Up</a>
+    nav.innerHTML = `
+      <a href="index.html">Home</a>
+      <a href="login.html">Login</a>
+      <a href="register.html">Register</a>
     `;
   }
 }
