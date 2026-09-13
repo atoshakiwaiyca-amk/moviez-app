@@ -6,7 +6,7 @@
 <title>Moviez — Movies. Anytime. Anywhere.</title>
 <link rel="stylesheet" href="css/style.css" />
 
-<!-- Supabase SDK CDN -->
+<!-- 1. WEKA SUPABASE SDK HAPA -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -27,17 +27,23 @@
 <script>
 renderNav();
 
+// Anzisha Supabase client
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 async function loadMovies() {
   const grid = document.getElementById('grid');
   const emptyEl = document.getElementById('empty');
   
   try {
-    const res = await apiFetch('/movies');
-    
-    // Hakikisha 'movies' ni array hata kama data imekuja ndani ya object
-    const movies = Array.isArray(res) ? res : (res.movies || []);
+    // Chukua movies moja kwa moja kutoka Supabase Database Table
+    const { data: movies, error } = await supabase
+      .from('movies')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-    if (!Array.isArray(movies) || movies.length === 0) {
+    if (error) throw error;
+
+    if (!movies || movies.length === 0) {
       emptyEl.style.display = 'block';
       grid.innerHTML = '';
       return;
