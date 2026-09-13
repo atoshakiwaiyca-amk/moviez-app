@@ -1,3 +1,6 @@
+// Anzisha Supabase client
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 // ---------- PAGE GUARD: admins only ----------
 const user = getUser();
 if (!getToken() || !user || user.role !== 'admin') {
@@ -7,10 +10,13 @@ if (!getToken() || !user || user.role !== 'admin') {
   init();
 }
 
-document.getElementById('logoutBtn').addEventListener('click', (e) => {
-  e.preventDefault();
-  logout();
-});
+const logoutBtn = document.getElementById('logoutBtn');
+if (logoutBtn) {
+  logoutBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    logout();
+  });
+}
 
 // ---------- TABS ----------
 document.querySelectorAll('.tab-btn').forEach((btn) => {
@@ -27,34 +33,49 @@ async function init() {
   document.getElementById('uploadForm').addEventListener('submit', handleUpload);
 }
 
+// ---------- LOAD STATS (From Supabase) ----------
 async function loadStats() {
   try {
-    const s = await apiFetch('/admin/stats');
+    const { count: totalMovies } = await supabase.from('movies').select('*', { count: 'exact', head: true });
+    const { count: totalUsers } = await supabase.from('users').select('*', { count: 'exact', head: true });
+    const { data: sales } = await supabase.from('purchases').select('amount');
+
+    const totalSalesCount = sales ? sales.length : 0;
+    const totalRevenue = sales ? sales.reduce((sum, item) => sum + (Number(item.amount) || 0), 0) : 0;
+
     document.getElementById('statCards').innerHTML = `
-      <div class="stat-card"><div class="num">${s.totalUsers}</div><div class="label">Users</div></div>
-      <div class="stat-card"><div class="num">${s.totalMovies}</div><div class="label">Movies</div></div>
-      <div class="stat-card"><div class="num">${s.totalSalesCount}</div><div class="label">Sales</div></div>
-      <div class="stat-card"><div class="num">TZS ${Number(s.totalRevenue).toLocaleString()}</div><div class="label">Revenue</div></div>
+      <div class="stat-card"><div class="num">${totalUsers || 0}</div><div class="label">Users</div></div>
+      <div class="stat-card"><div class="num">${totalMovies || 0}</div><div class="label">Movies</div></div>
+      <div class="stat-card"><div class="num">${totalSalesCount}</div><div class="label">Sales</div></div>
+      <div class="stat-card"><div class="num">TZS ${totalRevenue.toLocaleString()}</div><div class="label">Revenue</div></div>
     `;
   } catch (err) {
-    console.error(err);
+    console.error('Stats error:', err);
   }
 }
 
+// ---------- LOAD MOVIES (From Supabase) ----------
 async function loadMovies() {
   const el = document.getElementById('moviesList');
   try {
-    const movies = await apiFetch('/movies');
-    if (movies.length === 0) {
+    const { data: movies, error } = await supabase
+      .from('movies')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    if (!movies || movies.length === 0) {
       el.innerHTML = '<p style="color:#888;">No movies yet.</p>';
       return;
     }
+
     el.innerHTML = movies.map(m => `
       <div class="movie-row">
-        <img src="${m.poster_path ? 'http://localhost:4000' + m.poster_path : 'https://via.placeholder.com/50x75'}" />
+        <img src="${m.poster_path ? m.poster_path : 'https://via.placeholder.com/50x75'}" alt="${m.title}" />
         <div class="grow">
           <div style="font-weight:600;">${m.title}</div>
-          <div style="font-size:12px;color:#999;">TZS ${Number(m.price).toLocaleString()}</div>
+          <div style="font-size:12px;color:#999;">TZS ${Number(m.price || 0).toLocaleString()}</div>
         </div>
         <button class="del-btn" data-id="${m.id}">Delete</button>
       </div>
@@ -64,7 +85,8 @@ async function loadMovies() {
       btn.addEventListener('click', async () => {
         if (!confirm('Are you sure you want to delete this movie?')) return;
         try {
-          await apiFetch(`/movies/${btn.dataset.id}`, { method: 'DELETE' });
+          const { error: delErr } = await supabase.from('movies').delete().eq('id', btn.dataset.id);
+          if (delErr) throw delErr;
           loadMovies();
           loadStats();
         } catch (err) {
@@ -77,16 +99,19 @@ async function loadMovies() {
   }
 }
 
+// ---------- LOAD USERS (From Supabase) ----------
 async function loadUsers() {
   const body = document.getElementById('usersBody');
   try {
-    const users = await apiFetch('/admin/users');
-    body.innerHTML = users.map(u => `
+    const { data: users, error } = await supabase.from('users').select('*');
+    if (error) throw error;
+
+    body.innerHTML = (users || []).map(u => `
       <tr>
         <td>${u.email}</td>
-        <td>${u.created_at}</td>
-        <td>${u.role}</td>
-        <td>${u.total_purchases}</td>
+        <td>${new Date(u.created_at).toLocaleDateString()}</td>
+        <td>${u.role || 'user'}</td>
+        <td>${u.total_purchases || 0}</td>
       </tr>
     `).join('');
   } catch (err) {
@@ -94,20 +119,52 @@ async function loadUsers() {
   }
 }
 
+// ---------- HANDLE UPLOAD (Supabase Storage & Database) ----------
 async function handleUpload(e) {
   e.preventDefault();
   const msgEl = document.getElementById('uploadMsg');
-  const formData = new FormData();
-  formData.append('title', document.getElementById('title').value);
-  formData.append('description', document.getElementById('description').value);
-  formData.append('price', document.getElementById('price').value);
+  const title = document.getElementById('title').value.trim();
+  const description = document.getElementById('description').value.trim();
+  const price = parseFloat(document.getElementById('price').value);
   const posterFile = document.getElementById('poster').files[0];
   const videoFile = document.getElementById('video').files[0];
-  if (posterFile) formData.append('poster', posterFile);
-  formData.append('video', videoFile);
+
+  if (!title || !price || !videoFile) {
+    showMsg(msgEl, 'Please provide a title, price, and video file.');
+    return;
+  }
+
+  showMsg(msgEl, 'Uploading files to Supabase Storage...', 'info');
 
   try {
-    await apiFetch('/movies', { method: 'POST', body: formData });
+    let posterUrl = null;
+    let videoUrl = null;
+
+    // 1. Upload Poster
+    if (posterFile) {
+      const posterName = `${Date.now()}_${posterFile.name.replace(/\s+/g, '_')}`;
+      const { data: pData, error: pErr } = await supabase.storage.from('posters').upload(posterName, posterFile);
+      if (pErr) throw new Error(`Poster upload failed: ${pErr.message}`);
+      
+      const { data: pUrl } = supabase.storage.from('posters').getPublicUrl(pData.path);
+      posterUrl = pUrl.publicUrl;
+    }
+
+    // 2. Upload Video
+    const videoName = `${Date.now()}_${videoFile.name.replace(/\s+/g, '_')}`;
+    const { data: vData, error: vErr } = await supabase.storage.from('videos').upload(videoName, videoFile);
+    if (vErr) throw new Error(`Video upload failed: ${vErr.message}`);
+    
+    const { data: vUrl } = supabase.storage.from('videos').getPublicUrl(vData.path);
+    videoUrl = vUrl.publicUrl;
+
+    // 3. Save Record to Supabase 'movies' Table
+    const { error: dbErr } = await supabase.from('movies').insert([
+      { title, description, price, poster_path: posterUrl, video_path: videoUrl }
+    ]);
+
+    if (dbErr) throw dbErr;
+
     showMsg(msgEl, 'Movie uploaded successfully!', 'success');
     document.getElementById('uploadForm').reset();
     loadMovies();

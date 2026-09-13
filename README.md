@@ -49,9 +49,7 @@ Do the same for the `admin/` folder to reach the dashboard
 (`admin/dashboard.html`). Log in on the frontend `login.html` with your admin
 email/password — it will redirect you straight to the dashboard.
 
-If you deploy the backend somewhere other than `localhost:4000`, update the
-`API_BASE` value in `frontend/js/config.js` and the hard-coded
-`http://localhost:4000` references in the HTML files.
+For production deployments (e.g., Render), all frontend requests use relative paths (`/api`) so no manual `localhost` updates are needed in `frontend/js/config.js` or HTML files.
 
 ## Security features already built in
 

@@ -8,10 +8,15 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
-// ---------- MULTER (file uploads) ----------
+// ---------- ENSURE UPLOAD DIRECTORIES EXIST ----------
 const posterDir = path.join(__dirname, '..', 'uploads', 'posters');
 const videoDir = path.join(__dirname, '..', 'uploads', 'videos');
 
+// Tengeneza ma-folder kiotomatiki kama hayapo
+if (!fs.existsSync(posterDir)) fs.mkdirSync(posterDir, { recursive: true });
+if (!fs.existsSync(videoDir)) fs.mkdirSync(videoDir, { recursive: true });
+
+// ---------- MULTER (file uploads) ----------
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     if (file.fieldname === 'poster') cb(null, posterDir);
@@ -38,75 +43,101 @@ const upload = multer({
   },
 });
 
-// ---------- PUBLIC: List movies (no video path - that stays private) ----------
+// Helper kwa ajili ya kushughulikia makosa ya Multer
+const uploadFields = upload.fields([
+  { name: 'poster', maxCount: 1 },
+  { name: 'video', maxCount: 1 },
+]);
+
+// ---------- PUBLIC: List movies ----------
 router.get('/', (req, res) => {
-  const movies = db
-    .prepare('SELECT id, title, description, poster_path, price, created_at FROM movies ORDER BY created_at DESC')
-    .all();
-  res.json(movies);
+  try {
+    const movies = db
+      .prepare('SELECT id, title, description, poster_path, price, created_at FROM movies ORDER BY created_at DESC')
+      .all();
+    res.json(movies || []);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch movies.' });
+  }
 });
 
 router.get('/:id', (req, res) => {
-  const movie = db
-    .prepare('SELECT id, title, description, poster_path, price, created_at FROM movies WHERE id = ?')
-    .get(req.params.id);
-  if (!movie) return res.status(404).json({ error: 'Movie not found.' });
-  res.json(movie);
+  try {
+    const movie = db
+      .prepare('SELECT id, title, description, poster_path, price, created_at FROM movies WHERE id = ?')
+      .get(req.params.id);
+    if (!movie) return res.status(404).json({ error: 'Movie not found.' });
+    res.json(movie);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch movie details.' });
+  }
 });
 
 // ---------- ADMIN: Upload a new movie ----------
-router.post(
-  '/',
-  requireAuth,
-  requireAdmin,
-  upload.fields([{ name: 'poster', maxCount: 1 }, { name: 'video', maxCount: 1 }]),
-  (req, res) => {
+router.post('/', requireAuth, requireAdmin, (req, res) => {
+  uploadFields(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ error: err.message });
+    }
+
     const { title, description, price } = req.body;
     if (!title || !price || !req.files?.video) {
       return res.status(400).json({ error: 'Please provide a title, price, and video file.' });
     }
 
-    const posterPath = req.files.poster ? `/uploads/posters/${req.files.poster[0].filename}` : null;
-    const videoPath = `/uploads/videos/${req.files.video[0].filename}`;
+    try {
+      const posterPath = req.files.poster ? `/uploads/posters/${req.files.poster[0].filename}` : null;
+      const videoPath = `/uploads/videos/${req.files.video[0].filename}`;
 
-    const info = db
-      .prepare('INSERT INTO movies (title, description, poster_path, video_path, price) VALUES (?, ?, ?, ?, ?)')
-      .run(title, description || '', posterPath, videoPath, parseFloat(price));
+      const info = db
+        .prepare('INSERT INTO movies (title, description, poster_path, video_path, price) VALUES (?, ?, ?, ?, ?)')
+        .run(title, description || '', posterPath, videoPath, parseFloat(price));
 
-    res.status(201).json({ message: 'Movie uploaded successfully.', id: info.lastInsertRowid });
-  }
-);
+      res.status(201).json({ message: 'Movie uploaded successfully.', id: info.lastInsertRowid });
+    } catch (dbErr) {
+      res.status(500).json({ error: 'Database error saving movie.' });
+    }
+  });
+});
 
 // ---------- ADMIN: Delete a movie ----------
 router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
-  const movie = db.prepare('SELECT * FROM movies WHERE id = ?').get(req.params.id);
-  if (!movie) return res.status(404).json({ error: 'Movie not found.' });
+  try {
+    const movie = db.prepare('SELECT * FROM movies WHERE id = ?').get(req.params.id);
+    if (!movie) return res.status(404).json({ error: 'Movie not found.' });
 
-  // Remove the actual files from disk
-  [movie.poster_path, movie.video_path].forEach((p) => {
-    if (p) {
-      const fullPath = path.join(__dirname, '..', p);
-      if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
-    }
-  });
+    // Remove actual files from disk safely
+    [movie.poster_path, movie.video_path].forEach((p) => {
+      if (p) {
+        const fullPath = path.join(__dirname, '..', p);
+        if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+      }
+    });
 
-  db.prepare('DELETE FROM movies WHERE id = ?').run(req.params.id);
-  res.json({ message: 'Movie deleted.' });
+    db.prepare('DELETE FROM movies WHERE id = ?').run(req.params.id);
+    res.json({ message: 'Movie deleted successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete movie.' });
+  }
 });
 
-// ---------- ADMIN: Edit movie (title/description/price) ----------
+// ---------- ADMIN: Edit movie ----------
 router.put('/:id', requireAuth, requireAdmin, (req, res) => {
-  const { title, description, price } = req.body;
-  const movie = db.prepare('SELECT * FROM movies WHERE id = ?').get(req.params.id);
-  if (!movie) return res.status(404).json({ error: 'Movie not found.' });
+  try {
+    const { title, description, price } = req.body;
+    const movie = db.prepare('SELECT * FROM movies WHERE id = ?').get(req.params.id);
+    if (!movie) return res.status(404).json({ error: 'Movie not found.' });
 
-  db.prepare('UPDATE movies SET title = ?, description = ?, price = ? WHERE id = ?').run(
-    title || movie.title,
-    description ?? movie.description,
-    price ? parseFloat(price) : movie.price,
-    req.params.id
-  );
-  res.json({ message: 'Movie updated.' });
+    db.prepare('UPDATE movies SET title = ?, description = ?, price = ? WHERE id = ?').run(
+      title || movie.title,
+      description ?? movie.description,
+      price ? parseFloat(price) : movie.price,
+      req.params.id
+    );
+    res.json({ message: 'Movie updated successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update movie.' });
+  }
 });
 
 module.exports = router;

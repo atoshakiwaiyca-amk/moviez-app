@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Sign Up — Moviez</title>
 <link rel="stylesheet" href="css/style.css" />
+
+<!-- Supabase SDK CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <header class="topbar">
@@ -37,6 +40,10 @@
 <script src="js/app.js"></script>
 <script>
 renderNav();
+
+// Anzisha Supabase client
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 const form = document.getElementById('registerForm');
 const msgEl = document.getElementById('msg');
 
@@ -46,12 +53,24 @@ form.addEventListener('submit', async (e) => {
   const password = document.getElementById('password').value;
 
   try {
-    const data = await apiFetch('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
+    // Kutumia Supabase Auth moja kwa moja badala ya Express API
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password
     });
-    saveSession(data.token, data.user);
-    window.location.href = 'index.html';
+
+    if (error) {
+      showMsg(msgEl, error.message);
+      return;
+    }
+
+    if (data.session) {
+      setAuth(data.session.access_token, data.user);
+      window.location.href = 'index.html';
+    } else {
+      showMsg(msgEl, 'Account created! Check your email for confirmation.', 'success');
+    }
+
   } catch (err) {
     showMsg(msgEl, err.message);
   }

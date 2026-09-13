@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Log In — Moviez</title>
 <link rel="stylesheet" href="css/style.css" />
+
+<!-- Supabase SDK CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <header class="topbar">
@@ -34,6 +37,10 @@
 <script src="js/app.js"></script>
 <script>
 renderNav();
+
+// Anzisha Supabase Client
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 const form = document.getElementById('loginForm');
 const msgEl = document.getElementById('msg');
 
@@ -43,12 +50,39 @@ form.addEventListener('submit', async (e) => {
   const password = document.getElementById('password').value;
 
   try {
-    const data = await apiFetch('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
+    // 1. Tumia Supabase Auth ku-login
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
     });
-    saveSession(data.token, data.user);
-    window.location.href = data.user.role === 'admin' ? '../admin/dashboard.html' : 'index.html';
+
+    if (error) {
+      showMsg(msgEl, error.message);
+      return;
+    }
+
+    // 2. Chukua Maelezo ya Role kutoka Supabase Table ya 'users' au App Metadata
+    let role = 'user';
+    const { data: userProfile } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', data.user.id)
+      .single();
+
+    if (userProfile && userProfile.role) {
+      role = userProfile.role;
+    }
+
+    const userData = {
+      id: data.user.id,
+      email: data.user.email,
+      role: role
+    };
+
+    // 3. Hifadhi Session na Elekeza Mtumiaji Ukurasa Sahihi
+    setAuth(data.session.access_token, userData);
+    window.location.href = role === 'admin' ? 'admin.html' : 'index.html';
+
   } catch (err) {
     showMsg(msgEl, err.message);
   }
