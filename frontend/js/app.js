@@ -1,5 +1,8 @@
-// 1. Anzisha Supabase Client
-const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+// 1. Anzisha Supabase Client kwa usalama bila mgongano wa variables
+if (!window.supabaseClient) {
+  window.supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+}
+var supabase = window.supabaseClient;
 
 // 2. Auth Helpers
 function getToken() {
